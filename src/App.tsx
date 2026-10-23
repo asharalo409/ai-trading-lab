@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
 
 type Market = {
   symbol: string;
@@ -17,109 +18,149 @@ type Trade = {
 };
 
 type Language = "bn" | "en";
+type DataStatus = "loading" | "success" | "error";
 
-const initialMarkets: Market[] = [
-  { symbol: "BTC/USD", type: "CRYPTO", price: 67200, change: 0 },
-  { symbol: "ETH/USD", type: "CRYPTO", price: 2450, change: 0 },
-  { symbol: "SOL/USD", type: "CRYPTO", price: 155, change: 0 },
-  { symbol: "BNB/USD", type: "CRYPTO", price: 590, change: 0 },
-  { symbol: "XRP/USD", type: "CRYPTO", price: 0.55, change: 0 },
-  { symbol: "ADA/USD", type: "CRYPTO", price: 0.42, change: 0 },
-  { symbol: "DOGE/USD", type: "CRYPTO", price: 0.15, change: 0 },
-  { symbol: "AVAX/USD", type: "CRYPTO", price: 35, change: 0 },
-  { symbol: "EUR/USD", type: "FOREX", price: 1.084, change: 0 },
-  { symbol: "GBP/USD", type: "FOREX", price: 1.291, change: 0 },
-  { symbol: "USD/JPY", type: "FOREX", price: 149.5, change: 0 },
-  { symbol: "AUD/USD", type: "FOREX", price: 0.658, change: 0 },
+const CRYPTO_IDS: Record<string, string> = {
+  BTC: "btc-bitcoin",
+  ETH: "eth-ethereum",
+  SOL: "sol-solana",
+  BNB: "bnb-binance-coin",
+  XRP: "xrp-xrp",
+  ADA: "ada-cardano",
+  DOGE: "doge-dogecoin",
+  AVAX: "avax-avalanche",
+};
+
+const INITIAL_MARKETS: Market[] = [
+  ...Object.keys(CRYPTO_IDS).map((symbol) => ({
+    symbol: `${symbol}/USD`,
+    type: "CRYPTO" as const,
+    price: 0,
+    change: 0,
+  })),
+  { symbol: "EUR/USD", type: "FOREX", price: 0, change: 0 },
+  { symbol: "GBP/USD", type: "FOREX", price: 0, change: 0 },
+  { symbol: "USD/JPY", type: "FOREX", price: 0, change: 0 },
+  { symbol: "AUD/USD", type: "FOREX", price: 0, change: 0 },
 ];
 
-const fmt = (n: number) =>
-  n.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-const translations = {
+const TRANSLATIONS = {
   bn: {
-    subtitle: "একাধিক মার্কেটের ট্রেডিং সিমুলেটর",
+    subtitle: "ক্রিপ্টো ও ফরেক্স মার্কেট পর্যবেক্ষণ",
     demoMode: "ডেমো মোড",
     warning:
-      "শুধু সিমুলেশন — দামগুলো এলোমেলোভাবে তৈরি হয়। এখানে বাস্তব মার্কেট ডেটা, AI পূর্বাভাস বা আসল ট্রেড নেই।",
+      "শিক্ষামূলক ডেমো। ক্রিপ্টো ও ফরেক্স ডেটার উৎস এবং আপডেটের সময় দেখুন। এখানে আসল ট্রেড হয় না।",
     balance: "ভার্চুয়াল ব্যালেন্স",
-    pnl: "ডেমোর মোট লাভ/ক্ষতি",
-    trades: "রেকর্ড করা ট্রেড",
-    monitored: "পর্যবেক্ষণ করা মার্কেট",
+    pnl: "ডেমোর লাভ/ক্ষতি",
+    trades: "ডেমো ট্রেড",
+    monitored: "মার্কেট",
     markets: "মার্কেট",
     bot: "ডেমো বট",
     history: "ট্রেডের ইতিহাস",
     scanner: "মার্কেট স্ক্যানার",
-    sample: "সিমুলেট করা দামের নমুনা মার্কেট",
+    sample: "বাইরের ডেটা সোর্স থেকে পাওয়া দাম",
     all: "সব",
     crypto: "ক্রিপ্টো",
     forex: "ফরেক্স",
     buy: "কেনা",
     sell: "বিক্রি",
     wait: "অপেক্ষা",
-    signalNote: "*এগুলো শুধু উদাহরণ; ট্রেডিং পরামর্শ নয়।",
-    botTitle: "সিমুলেশন বট",
+    signalNote:
+      "২৪ ঘণ্টার পরিবর্তন শুধু তথ্য; এটি ট্রেডিং পরামর্শ বা নিশ্চিত সংকেত নয়।",
+    botTitle: "ভার্চুয়াল সিমুলেশন বট",
     botDescription:
-      "এই ডেমোতে এলোমেলো দামের ওঠানামা ব্যবহার করে ভার্চুয়াল লেনদেন দেখানো হয়। এটি কোনো AI ট্রেডিং কৌশল নয়।",
-    running: "সিমুলেশন চলছে",
-    paused: "সিমুলেশন বন্ধ আছে",
+      "শুধু অনুশীলনের জন্য ভার্চুয়াল ট্রেডের রেকর্ড তৈরি হয়। লাভ-ক্ষতি বাস্তব বাজারের ফল নয় এবং এটি AI পূর্বাভাস নয়।",
+    running: "ডেমো চলছে",
+    paused: "ডেমো বন্ধ",
     pause: "বট থামাও",
     start: "ডেমো বট চালু করো",
     reset: "আবার শুরু",
-    resultNote: "ডেমোর ফলাফল বাস্তব ট্রেডিংয়ের ফল অনুমান করে না।",
-    noTrades: "এখনো কোনো ডেমো ট্রেড নেই। প্রথমে ডেমো বট চালু করো।",
+    resultNote: "এখানে বাস্তব অর্থ ব্যবহার হয় না।",
+    noTrades: "এখনো কোনো ডেমো ট্রেড নেই।",
     time: "সময়",
     market: "মার্কেট",
     side: "ধরন",
     footer: "AI Trading Lab · শিক্ষামূলক ডেমো · বাস্তব ট্রেড নয়",
-    cryptoType: "ক্রিপ্টো",
-    forexType: "ফরেক্স",
+    loading: "মার্কেট ডেটা আনা হচ্ছে...",
+    success: "ডেটা আপডেট হয়েছে",
+    error: "মার্কেট ডেটা আনা যায়নি। ইন্টারনেট বা ডেটা সোর্স পরীক্ষা করো।",
+    refresh: "ডেটা আপডেট",
+    lastUpdate: "সর্বশেষ আপডেট",
+    cryptoSource: "ক্রিপ্টো: CoinPaprika",
+    forexSource: "ফরেক্স: Frankfurter রেফারেন্স রেট",
+    noPrice: "দাম পাওয়া যায়নি",
+    retry: "আবার চেষ্টা করো",
   },
   en: {
-    subtitle: "Multi-market trading simulator",
+    subtitle: "Crypto and forex market monitor",
     demoMode: "DEMO MODE",
     warning:
-      "SIMULATION ONLY — Prices are randomly generated. No real market data, AI predictions, or live trades.",
+      "Educational demo. Check market data sources and update times. No real trades are placed.",
     balance: "Virtual balance",
     pnl: "Demo profit/loss",
-    trades: "Recorded trades",
-    monitored: "Markets monitored",
+    trades: "Demo trades",
+    monitored: "Markets",
     markets: "Markets",
     bot: "Demo bot",
     history: "Trade history",
     scanner: "Market Scanner",
-    sample: "Sample markets with simulated prices",
+    sample: "Prices retrieved from external data sources",
     all: "All",
     crypto: "Crypto",
     forex: "Forex",
     buy: "BUY",
     sell: "SELL",
     wait: "WAIT",
-    signalNote: "*Illustrative signals only, not trading advice.",
-    botTitle: "Simulation Bot",
+    signalNote:
+      "24-hour change is informational only, not trading advice or a confirmed signal.",
+    botTitle: "Virtual Simulation Bot",
     botDescription:
-      "This demo shows virtual transactions using random price movements. It is not an AI trading strategy.",
-    running: "SIMULATION RUNNING",
-    paused: "SIMULATION PAUSED",
+      "Creates virtual trade records for practice only. Demo profit/loss is not a real market result or an AI prediction.",
+    running: "DEMO RUNNING",
+    paused: "DEMO PAUSED",
     pause: "Pause bot",
     start: "Start demo bot",
     reset: "Reset",
-    resultNote: "Demo results do not predict real-world performance.",
-    noTrades: "No demo trades yet. Start the demo bot first.",
+    resultNote: "No real money is used.",
+    noTrades: "No demo trades yet.",
     time: "Time",
     market: "Market",
     side: "Side",
     footer: "AI Trading Lab · Educational demo · No real trading",
-    cryptoType: "CRYPTO",
-    forexType: "FOREX",
+    loading: "Loading market data...",
+    success: "Market data updated",
+    error: "Could not load market data. Check your connection or data source.",
+    refresh: "Refresh data",
+    lastUpdate: "Last update",
+    cryptoSource: "Crypto: CoinPaprika",
+    forexSource: "Forex: Frankfurter reference rates",
+    noPrice: "No price available",
+    retry: "Try again",
   },
 };
 
+function formatPrice(price: number) {
+  if (!Number.isFinite(price) || price <= 0) return "—";
+
+  return price.toLocaleString("en-US", {
+    minimumFractionDigits: price < 1 ? 4 : 2,
+    maximumFractionDigits: price < 1 ? 6 : 4,
+  });
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatChange(value: number) {
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
 export default function App() {
-  const [markets, setMarkets] = useState(initialMarkets);
+  const [markets, setMarkets] = useState<Market[]>(INITIAL_MARKETS);
   const [balance, setBalance] = useState(10000);
   const [realized, setRealized] = useState(0);
   const [running, setRunning] = useState(false);
@@ -127,54 +168,166 @@ export default function App() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tab, setTab] = useState("markets");
   const [language, setLanguage] = useState<Language>("bn");
+  const [status, setStatus] = useState<DataStatus>("loading");
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const t = translations[language];
+  const t = TRANSLATIONS[language];
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setMarkets((old) =>
-        old.map((m) => {
-          const move = (Math.random() - 0.5) * 0.003;
+  const loadMarkets = useCallback(async () => {
+    setRefreshing(true);
+    setStatus("loading");
+
+    try {
+      const [cryptoResponse, forexResponse] = await Promise.all([
+        fetch("https://api.coinpaprika.com/v1/tickers", {
+          cache: "no-store",
+        }),
+        fetch(
+          "https://api.frankfurter.dev/v2/rates?base=USD&quotes=EUR,GBP,JPY,AUD",
+          { cache: "no-store" }
+        ),
+      ]);
+
+      if (!cryptoResponse.ok || !forexResponse.ok) {
+        throw new Error("Market data request failed");
+      }
+
+      const cryptoData: Array<{
+        id: string;
+        quotes?: {
+          USD?: {
+            price?: number;
+            percent_change_24h?: number;
+          };
+        };
+      }> = await cryptoResponse.json();
+
+      const forexData: Array<{
+        base: string;
+        quote: string;
+        rate: number;
+      }> = await forexResponse.json();
+
+      const cryptoById = new Map(
+        cryptoData.map((coin) => [coin.id, coin])
+      );
+
+      const forexByQuote = new Map(
+        forexData.map((item) => [item.quote, item.rate])
+      );
+
+      const getForexRate = (quote: string) => {
+        const rate = forexByQuote.get(quote);
+        return typeof rate === "number" && rate > 0 ? rate : 0;
+      };
+
+      const eur = getForexRate("EUR");
+      const gbp = getForexRate("GBP");
+      const jpy = getForexRate("JPY");
+      const aud = getForexRate("AUD");
+
+      const nextMarkets: Market[] = [
+        ...Object.entries(CRYPTO_IDS).map(([symbol, id]) => {
+          const coin = cryptoById.get(id);
+          const price = coin?.quotes?.USD?.price;
+          const change = coin?.quotes?.USD?.percent_change_24h;
 
           return {
-            ...m,
-            price: Math.max(0.00001, m.price * (1 + move)),
-            change: move * 100,
+            symbol: `${symbol}/USD`,
+            type: "CRYPTO" as const,
+            price:
+              typeof price === "number" && Number.isFinite(price)
+                ? price
+                : 0,
+            change:
+              typeof change === "number" && Number.isFinite(change)
+                ? change
+                : 0,
           };
-        })
-      );
-    }, 2000);
+        }),
+        {
+          symbol: "EUR/USD",
+          type: "FOREX",
+          price: eur > 0 ? 1 / eur : 0,
+          change: 0,
+        },
+        {
+          symbol: "GBP/USD",
+          type: "FOREX",
+          price: gbp > 0 ? 1 / gbp : 0,
+          change: 0,
+        },
+        {
+          symbol: "USD/JPY",
+          type: "FOREX",
+          price: jpy,
+          change: 0,
+        },
+        {
+          symbol: "AUD/USD",
+          type: "FOREX",
+          price: aud > 0 ? 1 / aud : 0,
+          change: 0,
+        },
+      ];
+
+      const hasAnyPrice = nextMarkets.some((m) => m.price > 0);
+
+      if (!hasAnyPrice) {
+        throw new Error("No market prices returned");
+      }
+
+      setMarkets(nextMarkets);
+      setLastUpdate(new Date().toLocaleString());
+      setStatus("success");
+    } catch (error) {
+      console.error("Market data error:", error);
+      setStatus("error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMarkets();
+
+    const timer = window.setInterval(() => {
+      void loadMarkets();
+    }, 60000);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [loadMarkets]);
 
   useEffect(() => {
     if (!running) return;
 
     const timer = window.setInterval(() => {
       setMarkets((current) => {
-        const candidate = current.filter(
-          (m) => Math.abs(m.change) >= 0.08
+        const candidates = current.filter(
+          (m) => m.price > 0 && m.type === "CRYPTO"
         );
 
-        if (!candidate.length) return current;
+        if (candidates.length === 0) return current;
 
-        const m =
-          candidate[Math.floor(Math.random() * candidate.length)];
+        const market =
+          candidates[Math.floor(Math.random() * candidates.length)];
 
-        const side = m.change > 0 ? "BUY" : "SELL";
-        const pnl = (Math.random() - 0.5) * 4 - 0.05;
+        const side = Math.random() >= 0.5 ? "BUY" : "SELL";
 
-        setBalance((b) => b + pnl);
-        setRealized((p) => p + pnl);
+        // Virtual practice result only; not a real market P/L.
+        const pnl = Number(((Math.random() - 0.5) * 4).toFixed(2));
+
+        setBalance((value) => value + pnl);
+        setRealized((value) => value + pnl);
 
         setTrades((old) =>
           [
             {
               id: Date.now(),
-              symbol: m.symbol,
+              symbol: market.symbol,
               side,
-              price: m.price,
+              price: market.price,
               pnl,
               time: new Date().toLocaleTimeString(),
             },
@@ -184,22 +337,29 @@ export default function App() {
 
         return current;
       });
-    }, 5000);
+    }, 10000);
 
     return () => window.clearInterval(timer);
   }, [running]);
 
   const shown = markets.filter(
-    (m) => filter === "ALL" || m.type === filter
+    (market) => filter === "ALL" || market.type === filter
   );
 
   function reset() {
     setRunning(false);
-    setMarkets(initialMarkets);
     setBalance(10000);
     setRealized(0);
     setTrades([]);
+    void loadMarkets();
   }
+
+  const statusText =
+    status === "loading"
+      ? t.loading
+      : status === "success"
+        ? t.success
+        : t.error;
 
   return (
     <main className="app">
@@ -213,31 +373,62 @@ export default function App() {
           <button
             className="secondary"
             onClick={() =>
-              setLanguage((current) =>
-                current === "bn" ? "en" : "bn"
-              )
+              setLanguage((current) => (current === "bn" ? "en" : "bn"))
             }
           >
             {language === "bn" ? "English" : "বাংলা"}
           </button>
-
           <span className="demo">{t.demoMode}</span>
         </div>
       </header>
 
       <div className="warning">{t.warning}</div>
 
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <strong>{statusText}</strong>
+            {lastUpdate && (
+              <p className="muted small">
+                {t.lastUpdate}: {lastUpdate}
+              </p>
+            )}
+          </div>
+
+          <button
+            className="secondary"
+            onClick={() => void loadMarkets()}
+            disabled={refreshing}
+          >
+            {refreshing ? t.loading : t.refresh}
+          </button>
+        </div>
+
+        <p className="muted small">{t.cryptoSource}</p>
+        <p className="muted small">{t.forexSource}</p>
+
+        {status === "error" && (
+          <button
+            className="secondary"
+            onClick={() => void loadMarkets()}
+            disabled={refreshing}
+          >
+            {t.retry}
+          </button>
+        )}
+      </section>
+
       <section className="stats">
         <article className="stat">
           <span className="muted">{t.balance}</span>
-          <strong>${fmt(balance)}</strong>
+          <strong>${formatMoney(balance)}</strong>
         </article>
 
         <article className="stat">
           <span className="muted">{t.pnl}</span>
           <strong className={realized >= 0 ? "green" : "red"}>
             {realized >= 0 ? "+" : "-"}$
-            {fmt(Math.abs(realized))}
+            {formatMoney(Math.abs(realized))}
           </strong>
         </article>
 
@@ -248,7 +439,7 @@ export default function App() {
 
         <article className="stat">
           <span className="muted">{t.monitored}</span>
-          <strong>{markets.length}</strong>
+          <strong>{markets.filter((m) => m.price > 0).length}</strong>
         </article>
       </section>
 
@@ -259,14 +450,12 @@ export default function App() {
         >
           {t.markets}
         </button>
-
         <button
           className={tab === "bot" ? "active" : ""}
           onClick={() => setTab("bot")}
         >
           {t.bot}
         </button>
-
         <button
           className={tab === "history" ? "active" : ""}
           onClick={() => setTab("history")}
@@ -285,7 +474,7 @@ export default function App() {
 
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+              onChange={(event) => setFilter(event.target.value)}
               aria-label={t.scanner}
             >
               <option value="ALL">{t.all}</option>
@@ -295,40 +484,45 @@ export default function App() {
           </div>
 
           <div className="market-list">
-            {shown.map((m) => (
-              <article className="market" key={m.symbol}>
+            {shown.map((market) => (
+              <article className="market" key={market.symbol}>
                 <div>
-                  <strong>{m.symbol}</strong>
+                  <strong>{market.symbol}</strong>
                   <div className="muted small">
-                    {language === "bn"
-                      ? m.type === "CRYPTO"
-                        ? t.cryptoType
-                        : t.forexType
-                      : m.type}
+                    {market.type === "CRYPTO" ? t.crypto : t.forex}
                   </div>
                 </div>
 
                 <div className="right">
                   <strong>
-                    {m.price < 10
-                      ? m.price.toFixed(4)
-                      : m.price.toLocaleString("en-US", {
-                          maximumFractionDigits: 2,
-                        })}
+                    {market.price > 0
+                      ? formatPrice(market.price)
+                      : t.noPrice}
                   </strong>
 
-                  <div className={m.change >= 0 ? "green" : "red"}>
-                    {m.change >= 0 ? "+" : ""}
-                    {m.change.toFixed(3)}%
+                  <div
+                    className={
+                      market.type === "FOREX"
+                        ? "muted"
+                        : market.change >= 0
+                          ? "green"
+                          : "red"
+                    }
+                  >
+                    {market.type === "FOREX"
+                      ? "—"
+                      : formatChange(market.change)}
                   </div>
                 </div>
 
                 <span className="signal">
-                  {Math.abs(m.change) >= 0.08
-                    ? m.change > 0
-                      ? `${t.buy}*`
-                      : `${t.sell}*`
-                    : t.wait}
+                  {market.price <= 0
+                    ? "—"
+                    : market.type === "FOREX"
+                      ? t.wait
+                      : Math.abs(market.change) >= 5
+                        ? t.wait
+                        : t.wait}
                 </span>
               </article>
             ))}
@@ -344,13 +538,13 @@ export default function App() {
           <p className="muted">{t.botDescription}</p>
 
           <div className={running ? "bot-on" : "bot-off"}>
-            ● {running ? t.running : t.paused}
+            {running ? t.running : t.paused}
           </div>
 
           <div className="actions">
             <button
               className="primary"
-              onClick={() => setRunning((v) => !v)}
+              onClick={() => setRunning((value) => !value)}
             >
               {running ? t.pause : t.start}
             </button>
@@ -381,18 +575,20 @@ export default function App() {
                     <th>{t.pnl}</th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {trades.map((trade) => (
                     <tr key={trade.id}>
                       <td>{trade.time}</td>
-                      <td>{trade.symbol}</td>
                       <td>
-                        {trade.side === "BUY" ? t.buy : t.sell}
+                        {trade.symbol}
+                        <div className="muted small">
+                          ${formatPrice(trade.price)}
+                        </div>
                       </td>
+                      <td>{trade.side === "BUY" ? t.buy : t.sell}</td>
                       <td className={trade.pnl >= 0 ? "green" : "red"}>
                         {trade.pnl >= 0 ? "+" : "-"}$
-                        {fmt(Math.abs(trade.pnl))}
+                        {formatMoney(Math.abs(trade.pnl))}
                       </td>
                     </tr>
                   ))}
