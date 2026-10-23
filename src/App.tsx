@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
+import ArbitrageScanner from "./ArbitrageScanner";
 
 type Market = {
   symbol: string;
@@ -50,7 +51,7 @@ const TRANSLATIONS = {
     subtitle: "ক্রিপ্টো ও ফরেক্স মার্কেট পর্যবেক্ষণ",
     demoMode: "ডেমো মোড",
     warning:
-      "শিক্ষামূলক ডেমো। ক্রিপ্টো ও ফরেক্স ডেটার উৎস এবং আপডেটের সময় দেখুন। এখানে আসল ট্রেড হয় না।",
+      "শিক্ষামূলক ডেমো। এখানে আসল ট্রেড হয় না। বাজারের তথ্য ও আপডেটের সময় যাচাই করুন।",
     balance: "ভার্চুয়াল ব্যালেন্স",
     pnl: "ডেমোর লাভ/ক্ষতি",
     trades: "ডেমো ট্রেড",
@@ -58,6 +59,7 @@ const TRANSLATIONS = {
     markets: "মার্কেট",
     bot: "ডেমো বট",
     history: "ট্রেডের ইতিহাস",
+    arbitrage: "আরবিট্রাজ স্ক্যানার",
     scanner: "মার্কেট স্ক্যানার",
     sample: "বাইরের ডেটা সোর্স থেকে পাওয়া দাম",
     all: "সব",
@@ -70,7 +72,7 @@ const TRANSLATIONS = {
       "২৪ ঘণ্টার পরিবর্তন শুধু তথ্য; এটি ট্রেডিং পরামর্শ বা নিশ্চিত সংকেত নয়।",
     botTitle: "ভার্চুয়াল সিমুলেশন বট",
     botDescription:
-      "শুধু অনুশীলনের জন্য ভার্চুয়াল ট্রেডের রেকর্ড তৈরি হয়। লাভ-ক্ষতি বাস্তব বাজারের ফল নয় এবং এটি AI পূর্বাভাস নয়।",
+      "শুধু অনুশীলনের জন্য ভার্চুয়াল ট্রেডের রেকর্ড তৈরি হয়। এই ডেমোর লাভ-ক্ষতি এলোমেলো, বাস্তব বাজারের ফল নয় এবং AI পূর্বাভাসও নয়।",
     running: "ডেমো চলছে",
     paused: "ডেমো বন্ধ",
     pause: "বট থামাও",
@@ -84,13 +86,13 @@ const TRANSLATIONS = {
     footer: "AI Trading Lab · শিক্ষামূলক ডেমো · বাস্তব ট্রেড নয়",
     loading: "মার্কেট ডেটা আনা হচ্ছে...",
     success: "ডেটা আপডেট হয়েছে",
-    error: "মার্কেট ডেটা আনা যায়নি। ইন্টারনেট বা ডেটা সোর্স পরীক্ষা করো।",
+    error: "মার্কেট ডেটা আনা যায়নি। ইন্টারনেট বা ডেটা সোর্স পরীক্ষা করুন।",
     refresh: "ডেটা আপডেট",
     lastUpdate: "অ্যাপে ডেটা আনার সময়",
     cryptoSource: "ক্রিপ্টো: CoinPaprika",
     forexSource: "ফরেক্স: Frankfurter রেফারেন্স রেট",
     noPrice: "দাম পাওয়া যায়নি",
-    retry: "আবার চেষ্টা করো",
+    retry: "আবার চেষ্টা করুন",
     sourceTime: "সোর্সের আপডেট",
     noSourceTime: "সময় পাওয়া যায়নি",
   },
@@ -98,7 +100,7 @@ const TRANSLATIONS = {
     subtitle: "Crypto and forex market monitor",
     demoMode: "DEMO MODE",
     warning:
-      "Educational demo. Check market data sources and update times. No real trades are placed.",
+      "Educational demo only. No real trades are placed. Check data sources and timestamps.",
     balance: "Virtual balance",
     pnl: "Demo profit/loss",
     trades: "Demo trades",
@@ -106,6 +108,7 @@ const TRANSLATIONS = {
     markets: "Markets",
     bot: "Demo bot",
     history: "Trade history",
+    arbitrage: "Arbitrage Scanner",
     scanner: "Market Scanner",
     sample: "Prices retrieved from external data sources",
     all: "All",
@@ -118,7 +121,7 @@ const TRANSLATIONS = {
       "24-hour change is informational only, not trading advice or a confirmed signal.",
     botTitle: "Virtual Simulation Bot",
     botDescription:
-      "Creates virtual trade records for practice only. Demo profit/loss is not a real market result or an AI prediction.",
+      "Creates virtual practice records only. Demo P/L is random, not a real market result or AI prediction.",
     running: "DEMO RUNNING",
     paused: "DEMO PAUSED",
     pause: "Pause bot",
@@ -172,7 +175,7 @@ function formatSourceTime(
   if (!value) return null;
 
   if (type === "FOREX") {
-    // Frankfurter supplies a reference-rate date, not a live quote timestamp.
+    // Frankfurter returns a reference-rate date, not a live quote timestamp.
     return value;
   }
 
@@ -268,7 +271,7 @@ export default function App() {
             symbol: `${symbol}/USD`,
             type: "CRYPTO" as const,
             price:
-              typeof price === "number" && Number.isFinite(price)
+              typeof price === "number" && Number.isFinite(price) && price > 0
                 ? price
                 : 0,
             change:
@@ -308,10 +311,8 @@ export default function App() {
         },
       ];
 
-      const hasAnyPrice = nextMarkets.some((market) => market.price > 0);
-
-      if (!hasAnyPrice) {
-        throw new Error("No market prices returned");
+      if (!nextMarkets.some((market) => market.price > 0)) {
+        throw new Error("No valid market prices returned");
       }
 
       setMarkets(nextMarkets);
@@ -335,48 +336,43 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [loadMarkets]);
 
+  // Educational virtual records only. P/L is random, not market-based.
   useEffect(() => {
     if (!running) return;
 
     const timer = window.setInterval(() => {
-      setMarkets((current) => {
-        const candidates = current.filter(
-          (market) => market.price > 0 && market.type === "CRYPTO"
-        );
+      const candidates = markets.filter(
+        (market) => market.type === "CRYPTO" && market.price > 0
+      );
 
-        if (candidates.length === 0) return current;
+      if (candidates.length === 0) return;
 
-        const market =
-          candidates[Math.floor(Math.random() * candidates.length)];
+      const market =
+        candidates[Math.floor(Math.random() * candidates.length)];
 
-        const side = Math.random() >= 0.5 ? "BUY" : "SELL";
+      const side = Math.random() >= 0.5 ? "BUY" : "SELL";
+      const pnl = Number(((Math.random() - 0.5) * 4).toFixed(2));
 
-        // Virtual practice result only; not a real market P/L.
-        const pnl = Number(((Math.random() - 0.5) * 4).toFixed(2));
+      setBalance((value) => value + pnl);
+      setRealized((value) => value + pnl);
 
-        setBalance((value) => value + pnl);
-        setRealized((value) => value + pnl);
-
-        setTrades((old) =>
-          [
-            {
-              id: Date.now(),
-              symbol: market.symbol,
-              side,
-              price: market.price,
-              pnl,
-              time: new Date().toLocaleTimeString(),
-            },
-            ...old,
-          ].slice(0, 100)
-        );
-
-        return current;
-      });
+      setTrades((old) =>
+        [
+          {
+            id: Date.now(),
+            symbol: market.symbol,
+            side,
+            price: market.price,
+            pnl,
+            time: new Date().toLocaleTimeString(),
+          },
+          ...old,
+        ].slice(0, 100)
+      );
     }, 10000);
 
     return () => window.clearInterval(timer);
-  }, [running]);
+  }, [running, markets]);
 
   const shown = markets.filter(
     (market) => filter === "ALL" || market.type === filter
@@ -475,7 +471,9 @@ export default function App() {
 
         <article className="stat">
           <span className="muted">{t.monitored}</span>
-          <strong>{markets.filter((market) => market.price > 0).length}</strong>
+          <strong>
+            {markets.filter((market) => market.price > 0).length}
+          </strong>
         </article>
       </section>
 
@@ -486,12 +484,21 @@ export default function App() {
         >
           {t.markets}
         </button>
+
+        <button
+          className={tab === "arbitrage" ? "active" : ""}
+          onClick={() => setTab("arbitrage")}
+        >
+          {t.arbitrage}
+        </button>
+
         <button
           className={tab === "bot" ? "active" : ""}
           onClick={() => setTab("bot")}
         >
           {t.bot}
         </button>
+
         <button
           className={tab === "history" ? "active" : ""}
           onClick={() => setTab("history")}
@@ -539,9 +546,7 @@ export default function App() {
 
                 <div className="right">
                   <strong>
-                    {market.price > 0
-                      ? formatPrice(market.price)
-                      : t.noPrice}
+                    {market.price > 0 ? formatPrice(market.price) : t.noPrice}
                   </strong>
 
                   <div
@@ -560,13 +565,7 @@ export default function App() {
                 </div>
 
                 <span className="signal">
-                  {market.price <= 0
-                    ? "—"
-                    : market.type === "FOREX"
-                      ? t.wait
-                      : Math.abs(market.change) >= 5
-                        ? t.wait
-                        : t.wait}
+                  {market.price > 0 ? t.wait : "—"}
                 </span>
               </article>
             ))}
@@ -575,6 +574,8 @@ export default function App() {
           <p className="muted small">{t.signalNote}</p>
         </section>
       )}
+
+      {tab === "arbitrage" && <ArbitrageScanner language={language} />}
 
       {tab === "bot" && (
         <section className="panel">
