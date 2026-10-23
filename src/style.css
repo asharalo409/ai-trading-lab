@@ -18,7 +18,9 @@ body {
   background: #0b1120;
 }
 
-button, select {
+button,
+select,
+input {
   font: inherit;
 }
 
@@ -27,13 +29,20 @@ button {
   touch-action: manipulation;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .app {
   max-width: 1050px;
   margin: auto;
   padding: 22px 15px;
 }
 
-.header, .panel-head, .actions {
+.header,
+.panel-head,
+.actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -84,7 +93,8 @@ button {
   margin-bottom: 16px;
 }
 
-.stat, .panel {
+.stat,
+.panel {
   background: #131d30;
   border: 1px solid #26334a;
   border-radius: 13px;
@@ -102,8 +112,13 @@ button {
   overflow-wrap: anywhere;
 }
 
-.green { color: #34d399; }
-.red { color: #fb7185; }
+.green {
+  color: #34d399;
+}
+
+.red {
+  color: #fb7185;
+}
 
 .tabs {
   display: flex;
@@ -112,15 +127,18 @@ button {
   overflow-x: auto;
 }
 
-.tabs button, .secondary {
+.tabs button,
+.secondary {
   color: #cbd5e1;
   background: #1c2b40;
   border: 1px solid #384860;
   border-radius: 8px;
   padding: 11px 15px;
+  white-space: nowrap;
 }
 
-.tabs button.active, .primary {
+.tabs button.active,
+.primary {
   background: #047857;
   color: white;
   border-color: #059669;
@@ -179,7 +197,8 @@ select {
   font-weight: 800;
 }
 
-.bot-on, .bot-off {
+.bot-on,
+.bot-off {
   margin: 16px 0;
   padding: 13px;
   background: #1c2b40;
@@ -188,14 +207,17 @@ select {
   color: #fbbf24;
 }
 
-.bot-on { color: #34d399; }
+.bot-on {
+  color: #34d399;
+}
 
 .actions {
   justify-content: flex-start;
   flex-wrap: wrap;
 }
 
-.primary, .secondary {
+.primary,
+.secondary {
   padding: 12px 16px;
   border-radius: 8px;
   font-weight: 700;
@@ -217,7 +239,8 @@ table {
   font-size: 12px;
 }
 
-th, td {
+th,
+td {
   padding: 12px 8px;
   border-bottom: 1px solid #26334a;
   white-space: nowrap;
@@ -234,11 +257,169 @@ footer {
   font-size: 11px;
 }
 
+/* Arbitrage Scanner */
+
+.arb-panel {
+  overflow: hidden;
+}
+
+.arb-warning {
+  margin-top: 12px;
+}
+
+.arb-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.arb-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.arb-controls input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px;
+  color: #f1f5f9;
+  background: #1c2b40;
+  border: 1px solid #384860;
+  border-radius: 8px;
+}
+
+.arb-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.arb-card {
+  min-width: 0;
+  padding: 14px;
+  background: #0f192b;
+  border: 1px solid #26334a;
+  border-radius: 11px;
+}
+
+.arb-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.arb-status {
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.arb-status.fresh {
+  color: #34d399;
+  background: #12382f;
+}
+
+.arb-status.stale {
+  color: #fbbf24;
+  background: #292318;
+}
+
+.arb-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.arb-source-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  background: #131d30;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.arb-source-grid strong {
+  font-size: 12px;
+}
+
+.arb-result {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #26334a;
+}
+
+.arb-result > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.arb-result strong {
+  font-size: 13px;
+}
+
+.arb-verdict {
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
 @media (max-width: 650px) {
-  .app { padding: 16px 10px; }
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .stat { padding: 12px; }
-  .stat strong { font-size: 18px; }
-  .brand { font-size: 18px; }
-  .panel { padding: 13px; }
+  .app {
+    padding: 16px 10px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat {
+    padding: 12px;
+  }
+
+  .stat strong {
+    font-size: 18px;
+  }
+
+  .brand {
+    font-size: 18px;
+  }
+
+  .panel {
+    padding: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .arb-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .arb-card {
+    padding: 11px;
+  }
+
+  .arb-source-grid {
+    gap: 8px;
+  }
+
+  .arb-source-grid > div {
+    padding: 8px;
+  }
 }
