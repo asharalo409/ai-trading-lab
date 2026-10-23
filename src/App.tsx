@@ -6,6 +6,7 @@ type Market = {
   type: "CRYPTO" | "FOREX";
   price: number;
   change: number;
+  sourceUpdatedAt?: string;
 };
 
 type Trade = {
@@ -85,11 +86,13 @@ const TRANSLATIONS = {
     success: "ডেটা আপডেট হয়েছে",
     error: "মার্কেট ডেটা আনা যায়নি। ইন্টারনেট বা ডেটা সোর্স পরীক্ষা করো।",
     refresh: "ডেটা আপডেট",
-    lastUpdate: "সর্বশেষ আপডেট",
+    lastUpdate: "অ্যাপে ডেটা আনার সময়",
     cryptoSource: "ক্রিপ্টো: CoinPaprika",
     forexSource: "ফরেক্স: Frankfurter রেফারেন্স রেট",
     noPrice: "দাম পাওয়া যায়নি",
     retry: "আবার চেষ্টা করো",
+    sourceTime: "সোর্সের আপডেট",
+    noSourceTime: "সময় পাওয়া যায়নি",
   },
   en: {
     subtitle: "Crypto and forex market monitor",
@@ -131,11 +134,13 @@ const TRANSLATIONS = {
     success: "Market data updated",
     error: "Could not load market data. Check your connection or data source.",
     refresh: "Refresh data",
-    lastUpdate: "Last update",
+    lastUpdate: "App fetch time",
     cryptoSource: "Crypto: CoinPaprika",
     forexSource: "Forex: Frankfurter reference rates",
     noPrice: "No price available",
     retry: "Try again",
+    sourceTime: "Source updated",
+    noSourceTime: "Timestamp unavailable",
   },
 };
 
@@ -157,6 +162,25 @@ function formatMoney(value: number) {
 
 function formatChange(value: number) {
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function formatSourceTime(
+  value: string | undefined,
+  type: Market["type"],
+  language: Language
+) {
+  if (!value) return null;
+
+  if (type === "FOREX") {
+    // Frankfurter supplies a reference-rate date, not a live quote timestamp.
+    return value;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toLocaleString(language === "bn" ? "bn-BD" : "en-US");
 }
 
 export default function App() {
@@ -195,6 +219,7 @@ export default function App() {
 
       const cryptoData: Array<{
         id: string;
+        last_updated?: string;
         quotes?: {
           USD?: {
             price?: number;
@@ -207,6 +232,7 @@ export default function App() {
         base: string;
         quote: string;
         rate: number;
+        date?: string;
       }> = await forexResponse.json();
 
       const cryptoById = new Map(
@@ -214,13 +240,18 @@ export default function App() {
       );
 
       const forexByQuote = new Map(
-        forexData.map((item) => [item.quote, item.rate])
+        forexData.map((item) => [item.quote, item])
       );
 
       const getForexRate = (quote: string) => {
-        const rate = forexByQuote.get(quote);
-        return typeof rate === "number" && rate > 0 ? rate : 0;
+        const item = forexByQuote.get(quote);
+        return item && Number.isFinite(item.rate) && item.rate > 0
+          ? item.rate
+          : 0;
       };
+
+      const getForexDate = (quote: string) =>
+        forexByQuote.get(quote)?.date;
 
       const eur = getForexRate("EUR");
       const gbp = getForexRate("GBP");
@@ -244,6 +275,7 @@ export default function App() {
               typeof change === "number" && Number.isFinite(change)
                 ? change
                 : 0,
+            sourceUpdatedAt: coin?.last_updated,
           };
         }),
         {
@@ -251,28 +283,32 @@ export default function App() {
           type: "FOREX",
           price: eur > 0 ? 1 / eur : 0,
           change: 0,
+          sourceUpdatedAt: getForexDate("EUR"),
         },
         {
           symbol: "GBP/USD",
           type: "FOREX",
           price: gbp > 0 ? 1 / gbp : 0,
           change: 0,
+          sourceUpdatedAt: getForexDate("GBP"),
         },
         {
           symbol: "USD/JPY",
           type: "FOREX",
           price: jpy,
           change: 0,
+          sourceUpdatedAt: getForexDate("JPY"),
         },
         {
           symbol: "AUD/USD",
           type: "FOREX",
           price: aud > 0 ? 1 / aud : 0,
           change: 0,
+          sourceUpdatedAt: getForexDate("AUD"),
         },
       ];
 
-      const hasAnyPrice = nextMarkets.some((m) => m.price > 0);
+      const hasAnyPrice = nextMarkets.some((market) => market.price > 0);
 
       if (!hasAnyPrice) {
         throw new Error("No market prices returned");
@@ -305,7 +341,7 @@ export default function App() {
     const timer = window.setInterval(() => {
       setMarkets((current) => {
         const candidates = current.filter(
-          (m) => m.price > 0 && m.type === "CRYPTO"
+          (market) => market.price > 0 && market.type === "CRYPTO"
         );
 
         if (candidates.length === 0) return current;
@@ -439,7 +475,7 @@ export default function App() {
 
         <article className="stat">
           <span className="muted">{t.monitored}</span>
-          <strong>{markets.filter((m) => m.price > 0).length}</strong>
+          <strong>{markets.filter((market) => market.price > 0).length}</strong>
         </article>
       </section>
 
@@ -490,6 +526,14 @@ export default function App() {
                   <strong>{market.symbol}</strong>
                   <div className="muted small">
                     {market.type === "CRYPTO" ? t.crypto : t.forex}
+                  </div>
+                  <div className="muted small">
+                    {t.sourceTime}:{" "}
+                    {formatSourceTime(
+                      market.sourceUpdatedAt,
+                      market.type,
+                      language
+                    ) ?? t.noSourceTime}
                   </div>
                 </div>
 
